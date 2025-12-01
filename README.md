@@ -1,95 +1,75 @@
 # Credit Card Default Prediction  
-**Author:** Mahipal Mali  
-**Tools:** Python, Scikit-Learn, Pandas, Matplotlib, Seaborn  
+Author: Mahipal Mali  
 
-This project predicts whether a credit card customer will default on their loan using machine learning.  
-The workflow includes: data understanding, exploratory data analysis (EDA), preprocessing, model training, evaluation, and inference.
-
----
-
-## 📌 Project Overview
-- **Goal:** Predict customer default (0 = No Default, 1 = Default)
-- **Dataset size:** 2,000 rows × 5 columns  
-- **Features:**
-  - Income  
-  - Age  
-  - Loan  
-  - Loan to Income Ratio  
-  - Default (Target)
+This project predicts whether a customer will default on a credit card payment using Logistic Regression and Random Forest.  
+The repository follows a modular, industry-style ML project structure.
 
 ---
 
-## 📊 EDA Highlights
-- No missing values  
-- Balanced preprocessing  
-- Strong correlation of *Loan to Income* with *Default*  
-- Visualizations include:
-  - Histograms  
-  - Boxplots  
-  - Correlation heatmap  
-  - Confusion matrices  
-  - ROC curves  
+## 📁 Project Structure
+.
+├── data/
+│ ├── raw/ # raw dataset (if added later)
+│ └── processed/ # train_processed.csv, test_processed.csv
+├── models/ # saved ML models + scaler
+├── notebooks/
+│ └── credit_card_default_final.ipynb
+├── src/
+│ ├── data_loader.py # handles dataset loading
+│ ├── preprocessing.py # scaling, splitting, transformations
+│ ├── train.py # model training code
+│ └── predict.py # inference pipeline
+├── tests/
+│ └── test_basic.py # unit tests
+├── deployment/
+│ └── app.py # future Flask/FastAPI app file
+├── requirements.txt
+├── README.md
+└── .gitignore
 
 ---
 
-## ⚙️ Preprocessing Steps
-- Train–test split (80/20, stratified)  
-- Standard scaling of numeric features  
-- Saving processed datasets:
-  - `data/processed/train_processed.csv`
-  - `data/processed/test_processed.csv`
-- Saving scaler:  
-  `models/scaler_standard.joblib`
+## 🚀 How to Run
+
+### 1️⃣ Install dependencies
+pip install -r requirements.txt
+
+### 2️⃣ Run training (models saved inside `/models`)
+python src/train.py
+
+### 3️⃣ Run inference
+python src/predict.py
 
 ---
 
-## 🤖 Models Trained
-Two machine learning models were trained:
+## 📊 Models Trained
+- Logistic Regression  
+- Random Forest (Best model – highest ROC AUC = 1.00)
 
-1. **Logistic Regression**
-2. **Random Forest Classifier**
-
-**Selected Best Model:** Random Forest  
-**Best ROC-AUC:** 1.0000
-
-All models are saved in `/models`.
-
----
-
-## 🧪 Evaluation Metrics
-Metrics used:
-
-- Accuracy  
-- Precision  
-- Recall  
-- F1-Score  
-- ROC-AUC  
-
-Random Forest achieved perfect scores on the test set.
+Saved models:
+models/
+├── logisticregression.joblib
+├── randomforest.joblib
+├── best_model.joblib
+└── scaler_standard.joblib
 
 ---
 
-## 🚀 Inference Example
+## 🧪 Tests
+Run basic unit test:
+pytest
 
-```python
-import pandas as pd
-import joblib
+---
 
-# load scaler + best model
-scaler = joblib.load("models/scaler_standard.joblib")
-model = joblib.load("models/best_model.joblib")
+## 📄 Notebook for Evaluation
+Notebook used for model development:
 
-sample = {
-    "Income": 50000,
-    "Age": 35,
-    "Loan": 4000,
-    "Loan to Income": 0.08
-}
+notebooks/credit_card_default_final.ipynb
 
-df = pd.DataFrame([sample])
-scaled = scaler.transform(df)
-pred = model.predict(scaled)[0]
-proba = model.predict_proba(scaled)[0][1]
+---
 
-print("Prediction:", pred)
-print("Probability of default:", proba)
+## 📌 Next Improvements
+- Hyperparameter tuning  
+- SHAP explainability  
+- Deploy using FastAPI or Flask  
+- CI/CD pipeline  

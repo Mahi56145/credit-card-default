@@ -12,3 +12,4 @@ pydantic
 httpx
 python-multipart
 python-dotenv
+gunicorn==21.0.0

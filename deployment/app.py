@@ -1,100 +1,97 @@
 # deployment/app.py
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import joblib
-import os
 from pathlib import Path
+import os
 
-# PROJECT ROOT (two levels up from this file)
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# paths to ui build and models
-UI_DIST_DIR = BASE_DIR / "ui" / "dist"
-MODEL_PATH = BASE_DIR / "models" / "best_model.joblib"
-SCALER_PATH = BASE_DIR / "models" / "scaler_standard.joblib"
+BASE = Path(__file__).resolve().parent.parent  # repo root
+UI_DIST = BASE / "ui" / "dist"
 
 app = FastAPI(title="Credit Card Default API")
 
-# -- mount static UI build at /static --
-# This exposes:
-#  - /static/index.html         -> ui/dist/index.html
-#  - /static/assets/...         -> ui/dist/assets/...
-if UI_DIST_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(UI_DIST_DIR)), name="static")
+# --- Static files mount ---
+# Mount the entire ui/dist at /static so e.g. /static/index.html and /static/assets/* work.
+if UI_DIST.exists():
+    app.mount("/static", StaticFiles(directory=str(UI_DIST)), name="static")
 else:
-    # warn in logs if UI files missing
-    print(f"Warning: UI dist not found at {UI_DIST_DIR}. Build UI and place it there.")
+    # keep running but warn in logs
+    print(f"WARNING: ui/dist not found at {UI_DIST!s}. Static UI will 404 until built.")
 
-# Root: serve the SPA index.html
-@app.get("/")
+# --- Root route serves index.html from ui/dist ---
+@app.get("/", response_class=JSONResponse)
 def root():
-    index_file = UI_DIST_DIR / "index.html"
-    # if UI built, serve it; otherwise return a simple JSON
-    if index_file.exists():
-        return FileResponse(str(index_file))
+    # keep JSON root for API; separate route for full UI below
     return {"status": "ok", "message": "Credit-card-default API. Open /docs for interactive API."}
 
-# Request model for predict
+@app.get("/ui", response_class=FileResponse)
+def ui_index():
+    index = UI_DIST / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="UI not found. Build the UI and ensure ui/dist/index.html exists.")
+
+# convenience: serve same index at /static/index.html if needed (StaticFiles already does this if mounted correctly)
+# (No extra route needed — this is just explicit fallback)
+@app.get("/static/index.html", response_class=FileResponse)
+def static_index():
+    index = UI_DIST / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="UI not found.")
+
+# --- Prediction request model (match your earlier model) ---
 class PredictRequest(BaseModel):
     Income: float
     Age: float
     Loan: float
-    # UI may send either Loan_to_Income OR "Loan to Income"; use underscore in model
-    Loan_to_Income: float
+    Loan_to_Income: float  # use underscore name in request body
 
-# lazy-loaded model + scaler
+# --- lazy load model / scaler (use models/best_model.joblib etc.) ---
+MODEL_PATH = BASE / "models" / "best_model.joblib"
+SCALER_PATH = BASE / "models" / "scaler_standard.joblib"
 _model = None
 _scaler = None
 
 def load_resources():
     global _model, _scaler
-    if _model is None:
-        if MODEL_PATH.exists():
-            _model = joblib.load(str(MODEL_PATH))
-            print("Loaded model:", MODEL_PATH)
-        else:
-            print("Model file missing:", MODEL_PATH)
-    if _scaler is None:
-        if SCALER_PATH.exists():
-            _scaler = joblib.load(str(SCALER_PATH))
-            print("Loaded scaler:", SCALER_PATH)
-        else:
-            print("Scaler missing:", SCALER_PATH)
+    if _model is None and MODEL_PATH.exists():
+        _model = joblib.load(MODEL_PATH)
+    if _scaler is None and SCALER_PATH.exists():
+        _scaler = joblib.load(SCALER_PATH)
 
 @app.on_event("startup")
 def startup_event():
     load_resources()
     print("App started. Routes:", [r.path for r in app.routes])
+    print("UI_DIST:", str(UI_DIST))
 
 @app.post("/predict")
 def predict(req: PredictRequest):
     load_resources()
     if _model is None or _scaler is None:
-        raise HTTPException(500, detail="model or scaler not found on server. Check models/ folder.")
+        return {"error": "model or scaler not found. Check models/ folder."}
 
     import pandas as pd
-    # build DataFrame using the same column names used when training
     sample = pd.DataFrame([{
         "Income": req.Income,
         "Age": req.Age,
         "Loan": req.Loan,
-        # scaler previously expected column name "Loan to Income" (with space).
-        # We'll create the space-name column if scaler expects it; otherwise keep underscore.
+        # scaler expects "Loan to Income" column if you trained with that name
         "Loan to Income": req.Loan_to_Income
     }])
 
-    # If scaler was fit with feature_names (sklearn >= 1.0) check and rename if needed
+    # if the scaler was trained with feature_names_in_ attribute, ensure columns match
     try:
-        if hasattr(_scaler, "feature_names_in_"):
-            # if scaler expects underscore name, rename back to underscore
-            if "Loan_to_Income" in _scaler.feature_names_in_ and "Loan to Income" in sample.columns:
-                sample.rename(columns={"Loan to Income": "Loan_to_Income"}, inplace=True)
+        X = _scaler.transform(sample)
     except Exception:
-        pass
+        # attempt rename if needed
+        if "Loan_to_Income" in sample.columns and "Loan to Income" in getattr(_scaler, "feature_names_in_", []):
+            sample.rename(columns={"Loan_to_Income": "Loan to Income"}, inplace=True)
+        X = _scaler.transform(sample)
 
-    X = _scaler.transform(sample)
-    proba = _model.predict_proba(X)[:, 1][0]
+    proba = float(_model.predict_proba(X)[:, 1][0])
     label = int(_model.predict(X)[0])
-    return {"probability_of_default": float(proba), "predicted_label": label}
+    return {"probability_of_default": proba, "predicted_label": label}

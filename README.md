@@ -1,75 +1,169 @@
-# Credit Card Default Prediction  
-Author: Mahipal Mali  
+Credit Card Default Prediction — ML Web App (FastAPI + React)
 
-This project predicts whether a customer will default on a credit card payment using Logistic Regression and Random Forest.  
-The repository follows a modular, industry-style ML project structure.
+This project is a complete machine-learning web application that predicts whether a person is likely to default on a credit card loan.
 
----
+✔ Backend: FastAPI (Python)
+✔ Frontend: React + Tailwind (bundled inside ui/dist/)
+✔ Model: Random Forest (trained using scikit-learn)
+✔ Deployment: Render (Free Tier)
 
-## 📁 Project Structure
-.
-├── data/
-│ ├── raw/ # raw dataset (if added later)
-│ └── processed/ # train_processed.csv, test_processed.csv
-├── models/ # saved ML models + scaler
-├── notebooks/
-│ └── credit_card_default_final.ipynb
-├── src/
-│ ├── data_loader.py # handles dataset loading
-│ ├── preprocessing.py # scaling, splitting, transformations
-│ ├── train.py # model training code
-│ └── predict.py # inference pipeline
-├── tests/
-│ └── test_basic.py # unit tests
+🚀 Live Demo
+API Root:
+
+🔗 https://creditcardprediction-cxhb.onrender.com
+
+Full Web UI:
+
+🔗 https://creditcardprediction-cxhb.onrender.com/ui
+
+API Docs (Swagger):
+
+🔗 https://creditcardprediction-cxhb.onrender.com/docs
+
+📁 Project Structure
+credit-card-default/
+│
 ├── deployment/
-│ └── app.py # future Flask/FastAPI app file
+│   ├── app.py                 # FastAPI backend
+│   └── ...                    
+│
+├── models/
+│   ├── best_model.joblib
+│   ├── scaler_standard.joblib
+│
+├── ui/
+│   ├── dist/                  # Production-ready frontend bundle
+│   │   ├── index.html
+│   │   └── assets/
+│   └── src/                   # React source (optional)
+│
+├── data/                      # Raw + processed datasets
+│
 ├── requirements.txt
-├── README.md
-└── .gitignore
+└── README.md
 
----
+⚙️ Backend Endpoint Summary
+GET /
 
-## 🚀 How to Run
+Returns UI if available
 
-### 1️⃣ Install dependencies
+Otherwise simple JSON response
+
+GET /ui
+
+Loads the React UI from ui/dist/index.html.
+
+POST /predict
+
+Predict default probability.
+
+Example request:
+{
+  "Income": 50000,
+  "Age": 35,
+  "Loan": 4000,
+  "Loan_to_Income": 89
+}
+
+Example response:
+{
+  "probability_of_default": 0.29,
+  "predicted_label": 0
+}
+
+🧠 How the Model Works
+
+StandardScaler normalizes the input features
+
+RandomForestClassifier predicts probability of default
+
+Pretrained .joblib files are loaded lazily (only when needed)
+
+ML Files:
+
+models/best_model.joblib
+
+models/scaler_standard.joblib
+
+🔧 Local Development
+1. Create environment
+python -m venv venv
+source venv/bin/activate   # macOS/Linux
+venv\Scripts\activate      # Windows
+
+2. Install dependencies
 pip install -r requirements.txt
 
-### 2️⃣ Run training (models saved inside `/models`)
-python src/train.py
+3. Run FastAPI locally
+uvicorn deployment.app:app --reload
 
-### 3️⃣ Run inference
-python src/predict.py
 
----
+Local URLs:
 
-## 📊 Models Trained
-- Logistic Regression  
-- Random Forest (Best model – highest ROC AUC = 1.00)
+UI → http://127.0.0.1:8000/ui
 
-Saved models:
-models/
-├── logisticregression.joblib
-├── randomforest.joblib
-├── best_model.joblib
-└── scaler_standard.joblib
+API Docs → http://127.0.0.1:8000/docs
 
----
+☁️ Deploying on Render (Without Docker)
+1. Connect GitHub Repo
 
-## 🧪 Tests
-Run basic unit test:
-pytest
+Render → New Web Service → Select your repository.
 
----
+2. Configure Build Settings
+Setting	Value
+Runtime	Python
+Build Command	pip install -r requirements.txt
+Start Command	gunicorn deployment.app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+3. Make sure UI is built
 
-## 📄 Notebook for Evaluation
-Notebook used for model development:
+Render expects:
 
-notebooks/credit_card_default_final.ipynb
+ui/dist/index.html
+ui/dist/assets/*
 
----
 
-## 📌 Next Improvements
-- Hyperparameter tuning  
-- SHAP explainability  
-- Deploy using FastAPI or Flask  
-- CI/CD pipeline  
+If not built:
+
+cd ui
+npm install
+npm run build
+
+
+Then commit and push.
+
+Render automatically redeploys.
+
+🧪 Testing the API via cURL
+curl -X POST "https://creditcardprediction-cxhb.onrender.com/predict" \
+     -H "Content-Type: application/json" \
+     -d '{"Income":50000,"Age":35,"Loan":4000,"Loan_to_Income":89}'
+⚠️ Notes & Common Issues
+UI not showing on /. Only JSON appears
+
+Make sure:
+
+ui/dist/index.html
+
+
+exists AND is committed to GitHub.
+
+Worker Timeout / Out of Memory
+
+Use 1 worker on Render free tier
+
+Lazy loading model (already configured) prevents boot timeout
+
+404 on /static or /ui
+
+Means ui/dist/ is missing or incorrectly built.
+
+🙌 Credits
+
+Created by Mahipal (Mahi)
+Built with:
+
+Python, FastAPI, scikit-learn
+
+React, TailwindCSS
+
+Render Cloud Hosting
